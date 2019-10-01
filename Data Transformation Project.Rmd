@@ -131,8 +131,71 @@ cume_dist()
 ```{r}
 transmute(flights, hour * 60 + minute)
 transmute(flights, arr_time-dep_time)
+
+flights %>% 
+  mutate(dep_time = (dep_time %/% 100) * 60 + (dep_time %% 100), sched_dep_time = (sched_dep_time %/% 100) * 60 + (sched_dep_time %% 100),
+         arr_time = (arr_time %/% 100) * 60 + (arr_time %% 100), sched_arr_time = (sched_arr_time %/% 100) * 60 + (sched_arr_time %% 100)) %>%
+  transmute((arr_time - dep_time) %% (60*24) - air_time)
+
+
+flights %>% top_n(10, dep_delay)
+
 ```
 
+USING SUMMARIZE
+```{r}
+summarise(flights, delay = mean(dep_delay, na.rm = TRUE))
+by_day <- group_by(flights, year, month, day)
+summarise(by_day, delay = mean(dep_delay, na.rm = TRUE))
+
+delays <- flights %>% 
+  group_by(dest) %>% 
+  summarise(
+    count = n(),
+    dist = mean(distance, na.rm = TRUE),
+    delay = mean(arr_delay, na.rm = TRUE)
+  ) %>% 
+  filter(count > 20, dest != "HNL")
+
+ggplot(data = delays, mapping = aes(x = dist, y = delay)) +
+  geom_point(aes(size = count), alpha = 1/3) +
+  geom_smooth(se = FALSE)
+```
+
+Piping function, like the linux shell
+x %>% f(y)
+
+na.rm removes missing values
+
+```{r}
+not_cancelled <- flights %>% 
+  filter(!is.na(dep_delay), !is.na(arr_delay))
+
+not_cancelled %>% 
+  group_by(year, month, day) %>% 
+  summarise(mean = mean(dep_delay))
+
+delays <- not_cancelled %>% 
+  group_by(tailnum) %>% 
+  summarise(
+    delay = mean(arr_delay)
+  )
+
+ggplot(data = delays, mapping = aes(x = delay)) + 
+  geom_freqpoly(binwidth = 10)
+
+delays <- not_cancelled %>% 
+  group_by(tailnum) %>% 
+  summarise(
+    delay = mean(arr_delay, na.rm = TRUE),
+    n = n()
+  )
 
 
+delays %>% 
+  filter(n > 25) %>% 
+  ggplot(mapping = aes(x = n, y = delay)) + 
+    geom_point(alpha = 1/10)
+
+```
 
