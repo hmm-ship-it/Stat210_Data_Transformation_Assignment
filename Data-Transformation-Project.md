@@ -533,3 +533,157 @@ transmute(flights, arr_time-dep_time)
     ##  9                   281
     ## 10                   195
     ## # … with 336,766 more rows
+
+``` r
+flights %>% 
+  mutate(dep_time = (dep_time %/% 100) * 60 + (dep_time %% 100), sched_dep_time = (sched_dep_time %/% 100) * 60 + (sched_dep_time %% 100),
+         arr_time = (arr_time %/% 100) * 60 + (arr_time %% 100), sched_arr_time = (sched_arr_time %/% 100) * 60 + (sched_arr_time %% 100)) %>%
+  transmute((arr_time - dep_time) %% (60*24) - air_time)
+```
+
+    ## # A tibble: 336,776 x 1
+    ##    `(arr_time - dep_time)%%(60 * 24) - air_time`
+    ##                                            <dbl>
+    ##  1                                           -34
+    ##  2                                           -30
+    ##  3                                            61
+    ##  4                                            77
+    ##  5                                            22
+    ##  6                                           -44
+    ##  7                                            40
+    ##  8                                            19
+    ##  9                                            21
+    ## 10                                           -23
+    ## # … with 336,766 more rows
+
+``` r
+flights %>% top_n(10, dep_delay)
+```
+
+    ## # A tibble: 10 x 19
+    ##     year month   day dep_time sched_dep_time dep_delay arr_time
+    ##    <int> <int> <int>    <int>          <int>     <dbl>    <int>
+    ##  1  2013     1     9      641            900      1301     1242
+    ##  2  2013     1    10     1121           1635      1126     1239
+    ##  3  2013    12     5      756           1700       896     1058
+    ##  4  2013     3    17     2321            810       911      135
+    ##  5  2013     4    10     1100           1900       960     1342
+    ##  6  2013     6    15     1432           1935      1137     1607
+    ##  7  2013     6    27      959           1900       899     1236
+    ##  8  2013     7    22      845           1600      1005     1044
+    ##  9  2013     7    22     2257            759       898      121
+    ## 10  2013     9    20     1139           1845      1014     1457
+    ## # … with 12 more variables: sched_arr_time <int>, arr_delay <dbl>,
+    ## #   carrier <chr>, flight <int>, tailnum <chr>, origin <chr>, dest <chr>,
+    ## #   air_time <dbl>, distance <dbl>, hour <dbl>, minute <dbl>,
+    ## #   time_hour <dttm>
+
+USING SUMMARIZE
+
+``` r
+summarise(flights, delay = mean(dep_delay, na.rm = TRUE))
+```
+
+    ## # A tibble: 1 x 1
+    ##   delay
+    ##   <dbl>
+    ## 1  12.6
+
+``` r
+by_day <- group_by(flights, year, month, day)
+summarise(by_day, delay = mean(dep_delay, na.rm = TRUE))
+```
+
+    ## # A tibble: 365 x 4
+    ## # Groups:   year, month [12]
+    ##     year month   day delay
+    ##    <int> <int> <int> <dbl>
+    ##  1  2013     1     1 11.5 
+    ##  2  2013     1     2 13.9 
+    ##  3  2013     1     3 11.0 
+    ##  4  2013     1     4  8.95
+    ##  5  2013     1     5  5.73
+    ##  6  2013     1     6  7.15
+    ##  7  2013     1     7  5.42
+    ##  8  2013     1     8  2.55
+    ##  9  2013     1     9  2.28
+    ## 10  2013     1    10  2.84
+    ## # … with 355 more rows
+
+``` r
+delays <- flights %>% 
+  group_by(dest) %>% 
+  summarise(
+    count = n(),
+    dist = mean(distance, na.rm = TRUE),
+    delay = mean(arr_delay, na.rm = TRUE)
+  ) %>% 
+  filter(count > 20, dest != "HNL")
+
+ggplot(data = delays, mapping = aes(x = dist, y = delay)) +
+  geom_point(aes(size = count), alpha = 1/3) +
+  geom_smooth(se = FALSE)
+```
+
+    ## `geom_smooth()` using method = 'loess' and formula 'y ~ x'
+
+![](Data-Transformation-Project_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+Piping function, like the linux shell x %\>% f(y)
+
+na.rm removes missing values
+
+``` r
+not_cancelled <- flights %>% 
+  filter(!is.na(dep_delay), !is.na(arr_delay))
+
+not_cancelled %>% 
+  group_by(year, month, day) %>% 
+  summarise(mean = mean(dep_delay))
+```
+
+    ## # A tibble: 365 x 4
+    ## # Groups:   year, month [12]
+    ##     year month   day  mean
+    ##    <int> <int> <int> <dbl>
+    ##  1  2013     1     1 11.4 
+    ##  2  2013     1     2 13.7 
+    ##  3  2013     1     3 10.9 
+    ##  4  2013     1     4  8.97
+    ##  5  2013     1     5  5.73
+    ##  6  2013     1     6  7.15
+    ##  7  2013     1     7  5.42
+    ##  8  2013     1     8  2.56
+    ##  9  2013     1     9  2.30
+    ## 10  2013     1    10  2.84
+    ## # … with 355 more rows
+
+``` r
+delays <- not_cancelled %>% 
+  group_by(tailnum) %>% 
+  summarise(
+    delay = mean(arr_delay)
+  )
+
+ggplot(data = delays, mapping = aes(x = delay)) + 
+  geom_freqpoly(binwidth = 10)
+```
+
+![](Data-Transformation-Project_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+``` r
+delays <- not_cancelled %>% 
+  group_by(tailnum) %>% 
+  summarise(
+    delay = mean(arr_delay, na.rm = TRUE),
+    n = n()
+  )
+
+
+delays %>% 
+  filter(n > 25) %>% 
+  ggplot(mapping = aes(x = n, y = delay)) + 
+    geom_point(alpha = 1/10)
+```
+
+![](Data-Transformation-Project_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->
